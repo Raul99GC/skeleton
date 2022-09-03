@@ -1,6 +1,9 @@
 const uuid = require("uuid");
 const { hashPassword } = require("../utils/crypt");
 
+const Users = require('../models/user.model');
+const { where } = require("sequelize/types");
+
 const userDB = [{ 
   "id": "74cd6011-7e76-4d6d-b25b-1d6e4182ec2f",
   "first_name": "Sahid",
@@ -30,38 +33,90 @@ const userDB = [{
   "verified": false
 }];
 
-const getAllUsers = () => {
-  return userDB;
+const getAllUsers = async () => {
+
+  const data= await Users.findAll({
+    attributes: {
+      exclude: ['password']
+    }
+  })
+  return data;
   //? select * from users;
 };
 
-const getUserById = (id) => {
-  const data = userDB.filter((item) => item.id === id);
-  return data.length ? data[0] : false
+const getUserById = async(id) => {
+  
+  const data = await Users.findOne({
+    where: {
+      id
+    },
+    attributes: {
+      exclude: ['password']
+    }
+  })
+  return data
   //? select * from users where id = ${id};
 };
 
-const createUser = (data) => {
-  const newUser = {
-    id: uuid.v4(), //obligatorio y unico
-    first_name: data.first_name, //obligatorio
-    last_name: data.last_name, //obligatorio
-    email: data.email, //obligatorio y unico
-    password: hashPassword(data.password), //obligatorio
-    phone: data.phone ? data.phone : "", //unico
-    birthday_date: data.birthday_date, //obligatorio
-    rol: "normal", //obligatorio y por defecto "normal"
-    profile_image: data.profile_image ? data.profile_image : "",
-    country: data.country, //obligatorio
-    is_active: true, //obligatorio y por defecto true
-    verified: false, //obligatorio y por defecto false
-  };
-  userDB.push(newUser);
-  return newUser;
+
+const createUser = async (data) => {
+  
+  /* const newUser = await Users.create(
+    {
+      id: uuid.v4(), 
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      password: hashPassword(data.password), 
+      phone: data.phone ? data.phone : "", 
+      birthday_date: data.birthday_date, 
+      role: "normal", 
+      profile_image: data.profile_image,
+      country: data.country, 
+      is_active: true, 
+      verified: false,
+    }) */
+
+    const newUser = await Users.create({
+      ...data,
+      id: uuid.v4(),
+      password: hashPassword(data.password), 
+      role: "normal",
+      is_active: true,
+      verified: false,
+    })
+
+    return newUser
 };
 
-const editUser = (id, data) => {
-  const index = userDB.findIndex((user) => user.id === id);
+const editUser = async (userId, data, userRol) => {
+  
+  if(userRol === 'admin') {
+    const {id, password, verified, ...newData} = data
+    const response = await Users.update({
+      ...newData,
+      id,
+    }, {
+      where: {
+        id: userId
+      }
+    })
+    return response
+  } else {
+    const {id, password, verified, role, ...newData} = data
+    const response = await Users.update({
+      ...newData,
+      id,
+    }, {
+      where: {
+        id: userId
+      }
+    })
+    return response
+  }
+
+
+  /*
   if (index !== -1) {
     userDB[index] = {
       id: id,
@@ -71,7 +126,7 @@ const editUser = (id, data) => {
       password: userDB[index].password,
       phone: data.phone, //unico
       birthday_date: data.birthday_date,
-      rol: data.rol,
+      role: data.rol,
       profile_image: data.profile_image,
       country: data.country,
       is_active: data.is_active,
@@ -80,23 +135,39 @@ const editUser = (id, data) => {
     return userDB[index];
   } else {
     return createUser(data);
-  }
+  } */
 };
 
-const deleteUser = (id) => {
-  const index = userDB.findIndex(user => user.id === id)
-  if (index !== -1) {
-    userDB.splice(index, 1)
-    return true
-  } else {
-    return false
-  } 
+const deleteUser = async (id) => {
+  const data = await Users.destroy({
+    where: {
+      id
+    }
+  })
+  return data
 } 
 
-const getUserByEmail = (email) => {
-  const data = userDB.filter((item) => item.email === email);
-  return data.length ? data[0] : false
-  //? select * from users where email = ${email};
+const getUserByEmail = async (email) => {
+  const data = await Users.findOne({
+    where: {
+      email
+    },
+    attributes: {
+      exclude: ['password']
+    }
+  })
+  return data
+}
+
+const editProfileImg = async (userID, imgUrl) => {
+  const response = await Users.update({
+    image_url: imgUrl
+  }, {
+    where: {
+      id: userID
+    }
+  })
+  return response
 }
 
 
@@ -106,6 +177,7 @@ module.exports = {
   getUserById,
   editUser,
   deleteUser,
-  getUserByEmail
+  getUserByEmail,
+  editProfileImg
 }
 
